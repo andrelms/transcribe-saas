@@ -3,13 +3,9 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(request: NextRequest) {
   try {
-    const { url } = await request.json();
+    const { url, apiKey, model } = await request.json();
 
     if (!url) {
       return NextResponse.json(
@@ -38,9 +34,24 @@ export async function POST(request: NextRequest) {
       .trim()
       .slice(0, 8000);
 
+    // Use custom API key from request or fall back to environment variable
+    const useApiKey = apiKey || process.env.OPENAI_API_KEY;
+    const useModel = model || 'gpt-4-turbo-preview';
+
+    if (!useApiKey) {
+      return NextResponse.json(
+        { error: 'API key not configured. Please configure in settings.' },
+        { status: 401 }
+      );
+    }
+
+    const openai = new OpenAI({
+      apiKey: useApiKey,
+    });
+
     // Use OpenAI to summarize and extract key points
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: useModel,
       messages: [
         {
           role: 'system',

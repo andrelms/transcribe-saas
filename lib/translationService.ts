@@ -20,6 +20,11 @@ export class TranslationService {
     targetLang: string
   ): Promise<TranslationResult> {
     try {
+      // Get API config from localStorage
+      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aiApiKey') : null;
+      const provider = typeof window !== 'undefined' ? localStorage.getItem('aiProvider') : null;
+      const model = typeof window !== 'undefined' ? localStorage.getItem('aiModel') : null;
+
       const response = await fetch('/api/translate', {
         method: 'POST',
         headers: {
@@ -29,6 +34,9 @@ export class TranslationService {
           text,
           sourceLang,
           targetLang,
+          apiKey,
+          provider,
+          model,
         }),
       });
 

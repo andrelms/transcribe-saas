@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Upload, Link as LinkIcon, FileText, Globe, Volume2 } from 'lucide-react';
+import { Mic, MicOff, Upload, Link as LinkIcon, FileText, Globe, Volume2, Settings } from 'lucide-react';
 import SpeechRecognitionService, { TranscriptResult } from '@/lib/speechRecognition';
 import TranslationService from '@/lib/translationService';
 import ResponseGenerator from '@/lib/responseGenerator';
@@ -10,6 +10,7 @@ import TranscriptPanel from './TranscriptPanel';
 import ResponsePanel from './ResponsePanel';
 import ContextPanel from './ContextPanel';
 import LanguageSelector from './LanguageSelector';
+import SettingsPanel, { AIConfig } from './SettingsPanel';
 
 interface TranscriptEntry {
   id: string;
@@ -29,11 +30,32 @@ export default function InterviewTranslator() {
   const [targetLanguage, setTargetLanguage] = useState('pt-BR');
   const [learningLevel, setLearningLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [aiConfig, setAiConfig] = useState<AIConfig>({
+    provider: 'openai',
+    apiKey: '',
+    model: 'gpt-4-turbo-preview',
+  });
+  const [showApiWarning, setShowApiWarning] = useState(true);
 
   const recognitionRef = useRef<SpeechRecognitionService | null>(null);
   const translationRef = useRef<TranslationService>(new TranslationService());
   const responseGenRef = useRef<ResponseGenerator>(new ResponseGenerator());
   const contextExtractorRef = useRef<ContextExtractor>(new ContextExtractor());
+
+  // Load AI config from localStorage on mount
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('aiConfig');
+    if (savedConfig) {
+      try {
+        const config = JSON.parse(savedConfig);
+        setAiConfig(config);
+        setShowApiWarning(!config.apiKey);
+      } catch (error) {
+        console.error('Failed to load config:', error);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     recognitionRef.current = new SpeechRecognitionService(sourceLanguage);
@@ -141,16 +163,63 @@ export default function InterviewTranslator() {
     }
   };
 
+  const handleSaveConfig = (config: AIConfig) => {
+    setAiConfig(config);
+    localStorage.setItem('aiConfig', JSON.stringify(config));
+    localStorage.setItem('aiApiKey', config.apiKey);
+    localStorage.setItem('aiProvider', config.provider);
+    localStorage.setItem('aiModel', config.model);
+    setShowApiWarning(!config.apiKey);
+  };
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <header className="text-center mb-8">
+      <header className="text-center mb-8 relative">
         <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-2">
           Tradutor de Entrevistas em Tempo Real
         </h1>
         <p className="text-gray-600 dark:text-gray-300">
           Transcrição, tradução e sugestões de resposta para iniciantes
         </p>
+
+        {/* Settings Button */}
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="absolute top-0 right-0 p-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition flex items-center gap-2"
+          title="Configurações da API"
+        >
+          <Settings className="w-5 h-5" />
+          <span className="hidden sm:inline text-sm font-medium">Configurar API</span>
+        </button>
       </header>
+
+      {/* API Warning Banner */}
+      {showApiWarning && (
+        <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-4 rounded-lg">
+          <div className="flex items-start">
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
+                ⚠️ Configuração Necessária
+              </h3>
+              <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-2">
+                Configure sua chave da API para usar tradução e geração de respostas IA.
+              </p>
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium transition"
+              >
+                Configurar Agora
+              </button>
+            </div>
+            <button
+              onClick={() => setShowApiWarning(false)}
+              className="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200 ml-4"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel - Controls and Context */}
@@ -243,6 +312,14 @@ export default function InterviewTranslator() {
           />
         </div>
       </div>
+
+      {/* Settings Panel */}
+      <SettingsPanel
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSave={handleSaveConfig}
+        currentConfig={aiConfig}
+      />
     </div>
   );
 }

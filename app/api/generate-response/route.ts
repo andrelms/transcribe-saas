@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(request: NextRequest) {
   try {
-    const { question, context, targetLanguage, nativeLanguage, level } = await request.json();
+    const { question, context, targetLanguage, nativeLanguage, level, apiKey, model } = await request.json();
 
     if (!question || !targetLanguage || !nativeLanguage) {
       return NextResponse.json(
@@ -15,6 +11,21 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Use custom API key from request or fall back to environment variable
+    const useApiKey = apiKey || process.env.OPENAI_API_KEY;
+    const useModel = model || 'gpt-4-turbo-preview';
+
+    if (!useApiKey) {
+      return NextResponse.json(
+        { error: 'API key not configured. Please configure in settings.' },
+        { status: 401 }
+      );
+    }
+
+    const openai = new OpenAI({
+      apiKey: useApiKey,
+    });
 
     const levelInstructions = {
       beginner: 'Use very simple vocabulary and short sentences (A1-A2 level). Maximum 2 sentences.',
@@ -42,7 +53,7 @@ Format your response as a JSON array with this structure:
 ]`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: useModel,
       messages: [
         {
           role: 'system',

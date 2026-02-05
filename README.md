@@ -61,33 +61,44 @@ cd transcribe-saas
 npm install
 ```
 
-3. **Configure as variáveis de ambiente**
-```bash
-cp .env.example .env
-```
-
-Edite o arquivo `.env` e adicione sua chave da OpenAI:
-```
-OPENAI_API_KEY=sk-...
-```
-
-4. **Execute o servidor de desenvolvimento**
+3. **Execute o servidor de desenvolvimento**
 ```bash
 npm run dev
 ```
 
-5. **Acesse a aplicação**
+4. **Acesse a aplicação**
 Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
+
+5. **Configure a API (Duas opções)**
+
+   **Opção A: Interface do Usuário (Recomendado para testes)**
+   - Clique no botão "Configurar API" no canto superior direito
+   - Escolha o provedor (OpenAI, Anthropic, Google)
+   - Selecione o modelo
+   - Cole sua chave da API
+   - Clique em "Salvar Configurações"
+
+   **Opção B: Variável de Ambiente (Recomendado para produção)**
+   - Copie o arquivo `.env.example` para `.env`
+   - Adicione sua chave: `OPENAI_API_KEY=sk-...`
+   - Reinicie o servidor
 
 ## 📱 Como Usar
 
 ### Configuração Inicial
 
-1. **Selecione os idiomas**:
+1. **Configure a API** (primeira vez):
+   - Clique em "Configurar API" no canto superior direito
+   - Escolha o provedor de IA (OpenAI, Anthropic ou Google)
+   - Selecione o modelo desejado
+   - Cole sua chave da API
+   - Suas configurações são salvas localmente no navegador
+
+2. **Selecione os idiomas**:
    - Idioma do Interlocutor: O idioma que a outra pessoa está falando
    - Seu Idioma: O idioma no qual você quer receber as traduções
 
-2. **Escolha o nível de aprendizado**:
+3. **Escolha o nível de aprendizado**:
    - **Iniciante (A1-A2)**: Frases muito simples e curtas
    - **Intermediário (B1-B2)**: Vocabulário moderado e frases claras
    - **Avançado (C1-C2)**: Linguagem natural e fluente
@@ -191,13 +202,28 @@ transcribe-saas/
 - Texto: `/api/extract-text`
 - Resumo automático e pontos-chave
 
+## 🔐 Sobre Segurança da API
+
+### Modo Frontend (Configuração via Interface)
+- ✅ **Vantagens**: Fácil de configurar, ideal para desenvolvimento local
+- ⚠️ **Atenção**: A chave fica visível no navegador (localStorage)
+- 📝 **Uso recomendado**: Testes locais e desenvolvimento
+- 🔒 **Segurança**: Não compartilhe sua chave, use apenas localmente
+
+### Modo Backend (Variável de Ambiente)
+- ✅ **Vantagens**: Mais seguro, chave não exposta no frontend
+- ✅ **Uso recomendado**: Produção e ambientes compartilhados
+- 🔒 **Segurança**: A chave permanece no servidor
+
 ## 💡 Dicas de Uso
 
-1. **Microfone de Qualidade**: Use um bom microfone para melhor precisão
-2. **Ambiente Silencioso**: Reduza ruído de fundo para melhor transcrição
-3. **Fale Claramente**: Pause entre frases para melhor detecção
-4. **Adicione Contexto**: Mais contexto = respostas mais relevantes
-5. **Pratique a Pronúncia**: Use o text-to-speech para aprender
+1. **Configure sua API Key**: Obtenha gratuitamente em platform.openai.com
+2. **Microfone de Qualidade**: Use um bom microfone para melhor precisão
+3. **Ambiente Silencioso**: Reduza ruído de fundo para melhor transcrição
+4. **Fale Claramente**: Pause entre frases para melhor detecção
+5. **Adicione Contexto**: Mais contexto = respostas mais relevantes
+6. **Pratique a Pronúncia**: Use o text-to-speech para aprender
+7. **Escolha o Modelo Certo**: GPT-4 para melhor qualidade, GPT-3.5 para rapidez
 
 ## 🚧 Desenvolvimento Futuro
 

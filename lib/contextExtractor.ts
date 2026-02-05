@@ -20,6 +20,13 @@ export class ContextExtractor {
       const formData = new FormData();
       formData.append('file', file);
 
+      // Get API config from localStorage
+      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aiApiKey') : null;
+      const model = typeof window !== 'undefined' ? localStorage.getItem('aiModel') : null;
+
+      if (apiKey) formData.append('apiKey', apiKey);
+      if (model) formData.append('model', model);
+
       const response = await fetch('/api/extract-pdf', {
         method: 'POST',
         body: formData,
@@ -47,12 +54,16 @@ export class ContextExtractor {
 
   async extractFromURL(url: string): Promise<ExtractedContext> {
     try {
+      // Get API config from localStorage
+      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aiApiKey') : null;
+      const model = typeof window !== 'undefined' ? localStorage.getItem('aiModel') : null;
+
       const response = await fetch('/api/extract-url', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, apiKey, model }),
       });
 
       if (!response.ok) {

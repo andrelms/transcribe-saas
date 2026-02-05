@@ -15,6 +15,11 @@ export class ResponseGenerator {
     level: 'beginner' | 'intermediate' | 'advanced' = 'beginner'
   ): Promise<ResponseSuggestion[]> {
     try {
+      // Get API config from localStorage
+      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aiApiKey') : null;
+      const provider = typeof window !== 'undefined' ? localStorage.getItem('aiProvider') : null;
+      const model = typeof window !== 'undefined' ? localStorage.getItem('aiModel') : null;
+
       const response = await fetch('/api/generate-response', {
         method: 'POST',
         headers: {
@@ -26,6 +31,9 @@ export class ResponseGenerator {
           targetLanguage,
           nativeLanguage,
           level,
+          apiKey,
+          provider,
+          model,
         }),
       });
 
