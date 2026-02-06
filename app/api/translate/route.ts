@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import callAIWithFallback from '@/lib/aiFallback';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
 
     // Use custom API key from request or fall back to environment variable
     const useApiKey = apiKey || process.env.OPENAI_API_KEY;
-    const useModel = model || 'gpt-4-turbo-preview';
+    const useProvider = provider || 'google';
+    const useModel = model || 'gemini-3-flash-preview';
 
     if (!useApiKey) {
       return NextResponse.json(
@@ -23,25 +24,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Currently only supports OpenAI, can be extended for other providers
-    const openai = new OpenAI({
-      apiKey: useApiKey,
-    });
+    console.log(`🌐 Translating with provider: ${useProvider}, model: ${useModel}`);
 
-    const completion = await openai.chat.completions.create({
-      model: useModel,
-      messages: [
-        {
-          role: 'system',
-          content: `You are a professional translator. Translate the following text from ${sourceLang || 'auto-detect'} to ${targetLang}. Only return the translation, nothing else.`,
-        },
-        {
-          role: 'user',
-          content: text,
-        },
-      ],
-      temperature: 0.3,
-    });
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a professional translator. Translate the following text from ${sourceLang || 'auto-detect'} to ${targetLang}. Only return the translation, nothing else.`,
+      },
+      {
+        role: 'user',
+        content: text,
+      },
+    ];
+
+    const completion = await callAIWithFallback(
+      useApiKey,
+      useProvider,
+      useModel,
+      messages,
+      0.3
+    );
 
     const translation = completion.choices[0]?.message?.content || text;
 
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Translation error:', error);
     return NextResponse.json(
-      { error: 'Translation failed' },
+      { error: `Translation failed: ${error}` },
       { status: 500 }
     );
   }

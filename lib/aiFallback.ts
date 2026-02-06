@@ -27,25 +27,43 @@ export async function callAIWithFallback(
       try {
         console.log(`🔄 Tentando modelo ${i + 1}/${modelsToTry.length}: ${model}`);
 
-        // Try with Google AI SDK (adjust based on actual API)
+        // Combine system and user messages for Gemini
+        const systemMessage = messages.find(m => m.role === 'system');
+        const userMessages = messages.filter(m => m.role !== 'system');
+
+        const combinedContent = systemMessage
+          ? `${systemMessage.content}\n\n${userMessages.map(m => m.content).join('\n')}`
+          : userMessages.map(m => m.content).join('\n');
+
+        // Add JSON format instruction if needed
+        const finalContent = responseFormat?.type === 'json_object'
+          ? `${combinedContent}\n\nIMPORTANT: Respond with valid JSON only, no other text.`
+          : combinedContent;
+
+        // Try with Google AI SDK
         const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: messages.map(m => ({
-              role: m.role === 'system' ? 'model' : m.role,
-              parts: [{ text: m.content }]
-            })),
-            generationConfig: { temperature }
+            contents: [{
+              parts: [{ text: finalContent }]
+            }],
+            generationConfig: {
+              temperature,
+              responseMimeType: responseFormat?.type === 'json_object' ? 'application/json' : 'text/plain'
+            }
           })
         });
 
         if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error(`❌ Erro HTTP ${response.status}:`, errorData);
+
           if (i < modelsToTry.length - 1) {
             console.log(`⚠️ Modelo ${model} falhou, tentando próximo...`);
             continue;
           }
-          throw new Error(`All models failed`);
+          throw new Error(`All models failed. Last error: ${JSON.stringify(errorData)}`);
         }
 
         const data = await response.json();

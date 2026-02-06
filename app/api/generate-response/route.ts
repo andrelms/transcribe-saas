@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import callAIWithFallback from '@/lib/aiFallback';
 
 export async function POST(request: NextRequest) {
   try {
-    const { question, context, targetLanguage, nativeLanguage, level, apiKey, model } = await request.json();
+    const { question, context, targetLanguage, nativeLanguage, level, apiKey, provider, model } = await request.json();
 
     if (!question || !targetLanguage || !nativeLanguage) {
       return NextResponse.json(
@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
 
     // Use custom API key from request or fall back to environment variable
     const useApiKey = apiKey || process.env.OPENAI_API_KEY;
-    const useModel = model || 'gpt-4-turbo-preview';
+    const useProvider = provider || 'google';
+    const useModel = model || 'gemini-3-flash-preview';
 
     if (!useApiKey) {
       return NextResponse.json(
@@ -23,9 +24,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const openai = new OpenAI({
-      apiKey: useApiKey,
-    });
+    console.log(`🤖 Generating responses with provider: ${useProvider}, model: ${useModel}`);
 
     const levelInstructions = {
       beginner: 'Use very simple vocabulary and short sentences (A1-A2 level). Maximum 2 sentences.',
@@ -52,21 +51,25 @@ Format your response as a JSON array with this structure:
   }
 ]`;
 
-    const completion = await openai.chat.completions.create({
-      model: useModel,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: `Question: ${question}`,
-        },
-      ],
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-    });
+    const messages = [
+      {
+        role: 'system',
+        content: systemPrompt,
+      },
+      {
+        role: 'user',
+        content: `Question: ${question}`,
+      },
+    ];
+
+    const completion = await callAIWithFallback(
+      useApiKey,
+      useProvider,
+      useModel,
+      messages,
+      0.7,
+      { type: 'json_object' }
+    );
 
     const responseText = completion.choices[0]?.message?.content || '{"suggestions": []}';
     const parsed = JSON.parse(responseText);
@@ -76,7 +79,7 @@ Format your response as a JSON array with this structure:
   } catch (error) {
     console.error('Response generation error:', error);
     return NextResponse.json(
-      { error: 'Response generation failed' },
+      { error: `Response generation failed: ${error}` },
       { status: 500 }
     );
   }
