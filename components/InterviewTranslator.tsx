@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Settings, Upload, LinkIcon, FileText, X, Volume2, Copy, Check } from 'lucide-react';
+import { Mic, MicOff, Settings, Upload, LinkIcon, FileText, X, Volume2, Copy, Check, Monitor } from 'lucide-react';
 import SpeechRecognitionService, { TranscriptResult } from '@/lib/speechRecognition';
+import SystemAudioCapture, { AudioCaptureResult } from '@/lib/systemAudioCapture';
 import TranslationService from '@/lib/translationService';
 import ResponseGenerator, { ResponseSuggestion } from '@/lib/responseGenerator';
 import ContextExtractor, { ExtractedContext } from '@/lib/contextExtractor';
@@ -28,6 +29,7 @@ export default function InterviewTranslator() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showApiWarning, setShowApiWarning] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [audioSource, setAudioSource] = useState<'microphone' | 'system'>('microphone');
   const [aiConfig, setAiConfig] = useState<AIConfig>({
     provider: 'google',
     apiKey: '',
@@ -37,6 +39,7 @@ export default function InterviewTranslator() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionService | null>(null);
+  const systemAudioRef = useRef<SystemAudioCapture | null>(null);
   const translationRef = useRef<TranslationService>(new TranslationService());
   const responseGenRef = useRef<ResponseGenerator>(new ResponseGenerator());
   const contextExtractorRef = useRef<ContextExtractor>(new ContextExtractor());
@@ -56,12 +59,22 @@ export default function InterviewTranslator() {
 
   useEffect(() => {
     recognitionRef.current = new SpeechRecognitionService(sourceLanguage);
+    systemAudioRef.current = new SystemAudioCapture(sourceLanguage);
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
+      if (systemAudioRef.current) {
+        systemAudioRef.current.stop();
+      }
     };
   }, [sourceLanguage]);
+
+  useEffect(() => {
+    if (systemAudioRef.current && aiConfig.apiKey) {
+      systemAudioRef.current.setApiConfig(aiConfig.apiKey, aiConfig.provider, aiConfig.model);
+    }
+  }, [aiConfig]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -117,25 +130,56 @@ export default function InterviewTranslator() {
     }
   };
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('⚠️ Web Speech API não disponível. Use Chrome ou Edge!');
-      return;
-    }
+  const toggleListening = async () => {
+    if (audioSource === 'microphone') {
+      if (!recognitionRef.current) {
+        alert('⚠️ Web Speech API não disponível. Use Chrome ou Edge!');
+        return;
+      }
 
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-      console.log('🛑 Gravação parada');
-    } else {
-      console.log('🎤 Iniciando gravação...');
-      console.log('Idioma configurado:', sourceLanguage);
-      recognitionRef.current.start(handleTranscriptResult, (error) => {
-        console.error('❌ Erro na transcrição:', error);
-        alert(`Erro na transcrição: ${error}\n\nVerifique:\n1. Permissão do microfone\n2. Use Chrome ou Edge\n3. HTTPS ou localhost`);
+      if (isListening) {
+        recognitionRef.current.stop();
         setIsListening(false);
-      });
-      setIsListening(true);
+        console.log('🛑 Gravação parada');
+      } else {
+        console.log('🎤 Iniciando gravação do microfone...');
+        console.log('Idioma configurado:', sourceLanguage);
+        recognitionRef.current.start(handleTranscriptResult, (error) => {
+          console.error('❌ Erro na transcrição:', error);
+          alert(`Erro na transcrição: ${error}\n\nVerifique:\n1. Permissão do microfone\n2. Use Chrome ou Edge\n3. HTTPS ou localhost`);
+          setIsListening(false);
+        });
+        setIsListening(true);
+      }
+    } else {
+      // System audio capture
+      if (!systemAudioRef.current) {
+        alert('⚠️ Captura de áudio do sistema não disponível!');
+        return;
+      }
+
+      if (!aiConfig.apiKey) {
+        alert('⚠️ Configure a API Key nas configurações primeiro!\n\nÁudio de sistema requer API do Whisper/Google para transcrição.');
+        setIsSettingsOpen(true);
+        return;
+      }
+
+      if (isListening) {
+        systemAudioRef.current.stop();
+        setIsListening(false);
+        console.log('🛑 Captura de áudio do sistema parada');
+      } else {
+        console.log('🖥️ Iniciando captura de áudio do sistema...');
+        await systemAudioRef.current.start(
+          handleTranscriptResult as (result: AudioCaptureResult) => void,
+          (error) => {
+            console.error('❌ Erro na captura:', error);
+            alert(`Erro na captura de áudio: ${error}\n\nVerifique:\n1. Compartilhamento de aba/tela permitido\n2. Aba selecionada tem áudio\n3. Use Chrome ou Edge`);
+            setIsListening(false);
+          }
+        );
+        setIsListening(true);
+      }
     }
   };
 
@@ -260,10 +304,17 @@ export default function InterviewTranslator() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
         {conversations.length === 0 && !currentInterim && (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <Mic className="w-12 h-12 mb-2 opacity-50" />
+            {audioSource === 'microphone' ? (
+              <Mic className="w-12 h-12 mb-2 opacity-50" />
+            ) : (
+              <Monitor className="w-12 h-12 mb-2 opacity-50" />
+            )}
             <p className="text-center text-sm">
-              Clique no botão para iniciar<br />
-              a captura de áudio
+              {audioSource === 'microphone' ? (
+                <>Clique no botão para capturar<br />áudio do seu microfone</>
+              ) : (
+                <>Clique no botão para capturar<br />áudio de outra aba (Meet, Zoom, Teams)</>
+              )}
             </p>
           </div>
         )}
@@ -348,6 +399,36 @@ export default function InterviewTranslator() {
 
       {/* Fixed Bottom Controls */}
       <div className="bg-gray-800 border-t border-gray-700 px-3 py-2 flex-shrink-0 sticky bottom-0">
+        {/* Audio Source Toggle */}
+        <div className="flex gap-1 mb-2">
+          <button
+            onClick={() => setAudioSource('microphone')}
+            disabled={isListening}
+            className={`flex-1 py-1.5 px-2 rounded text-xs font-medium transition flex items-center justify-center gap-1 ${
+              audioSource === 'microphone'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+            } ${isListening ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title="Capturar do microfone (Web Speech API)"
+          >
+            <Mic className="w-3 h-3" />
+            Microfone
+          </button>
+          <button
+            onClick={() => setAudioSource('system')}
+            disabled={isListening}
+            className={`flex-1 py-1.5 px-2 rounded text-xs font-medium transition flex items-center justify-center gap-1 ${
+              audioSource === 'system'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+            } ${isListening ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title="Capturar de aba/sistema (Meet, Zoom, Teams)"
+          >
+            <Monitor className="w-3 h-3" />
+            Aba/Sistema
+          </button>
+        </div>
+
         <div className="flex items-center gap-2">
           <input
             ref={fileInputRef}
@@ -375,7 +456,9 @@ export default function InterviewTranslator() {
             className={`flex-1 py-2.5 px-4 rounded-full font-semibold text-white transition flex items-center justify-center gap-2 text-sm ${
               isListening
                 ? 'bg-red-600 hover:bg-red-700 animate-pulse'
-                : 'bg-green-600 hover:bg-green-700'
+                : audioSource === 'microphone'
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-purple-600 hover:bg-purple-700'
             }`}
           >
             {isListening ? (
@@ -385,12 +468,20 @@ export default function InterviewTranslator() {
               </>
             ) : (
               <>
-                <Mic className="w-5 h-5" />
-                Iniciar
+                {audioSource === 'microphone' ? <Mic className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+                Iniciar {audioSource === 'microphone' ? 'Microfone' : 'Aba/Sistema'}
               </>
             )}
           </button>
         </div>
+
+        {/* Helper Text */}
+        {audioSource === 'system' && (
+          <div className="mt-1.5 text-[10px] text-purple-400 flex items-center gap-1">
+            <Monitor className="w-3 h-3" />
+            Você poderá selecionar qual aba (Meet, Zoom, Teams) deseja transcrever
+          </div>
+        )}
       </div>
 
       <SettingsPanel
