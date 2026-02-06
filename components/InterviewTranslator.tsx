@@ -197,50 +197,56 @@ export default function InterviewTranslator() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-900">
-      {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex-shrink-0">
+      {/* Compact Header */}
+      <header className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">Tradutor de Entrevistas</h1>
-            <p className="text-sm text-gray-400">
-              {sourceLanguage === 'en' ? '🇺🇸 Inglês' : '🇧🇷 Português'} → {targetLanguage === 'pt-BR' ? '🇧🇷 Português' : '🇺🇸 Inglês'}
+            <h1 className="text-lg font-bold text-white">🎙️ Tradutor de Entrevistas</h1>
+            <p className="text-xs text-gray-400">
+              {sourceLanguage === 'en' ? '🇺🇸' : '🇧🇷'} → {targetLanguage === 'pt-BR' ? '🇧🇷' : '🇺🇸'}
             </p>
           </div>
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition"
+            title="Configurações"
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-4 h-4" />
           </button>
         </div>
 
         {showApiWarning && (
-          <div className="mt-2 bg-yellow-900/50 border border-yellow-700 rounded-lg p-2 flex items-center justify-between">
-            <p className="text-xs text-yellow-300">⚠️ Configure sua API Key</p>
+          <div className="mt-1 bg-yellow-900/50 border border-yellow-700 rounded p-1.5 flex items-center justify-between text-xs">
+            <span className="text-yellow-300">⚠️ Configure API</span>
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="text-xs bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded"
+              className="bg-yellow-700 hover:bg-yellow-600 text-white px-2 py-0.5 rounded"
             >
-              Configurar
+              Config
             </button>
           </div>
         )}
       </header>
 
-      {/* Context Pills */}
+      {/* Context Display - More Visible */}
       {contexts.length > 0 && (
-        <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex-shrink-0">
-          <div className="flex flex-wrap gap-2">
+        <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex-shrink-0">
+          <div className="text-xs text-gray-400 mb-1 font-semibold">📄 Contextos ({contexts.length}):</div>
+          <div className="space-y-1 max-h-24 overflow-y-auto">
             {contexts.map((ctx, idx) => (
               <div
                 key={idx}
-                className="bg-blue-900/50 border border-blue-700 rounded-full px-3 py-1 flex items-center gap-2 group"
+                className="bg-blue-900/30 border border-blue-700 rounded px-2 py-1 flex items-start gap-2 group text-xs"
               >
-                <FileText className="w-3 h-3 text-blue-400" />
-                <span className="text-xs text-blue-300">{ctx.source.name}</span>
+                <FileText className="w-3 h-3 text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-blue-300 font-medium truncate">{ctx.source.name}</div>
+                  <div className="text-blue-400/70 text-[10px] line-clamp-1">{ctx.summary}</div>
+                </div>
                 <button
                   onClick={() => removeContext(idx)}
-                  className="text-blue-400 hover:text-red-400 transition opacity-0 group-hover:opacity-100"
+                  className="text-red-400 hover:text-red-300 transition flex-shrink-0"
+                  title="Remover"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -250,50 +256,50 @@ export default function InterviewTranslator() {
         </div>
       )}
 
-      {/* Conversation Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+      {/* Compact Conversation Area */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
         {conversations.length === 0 && !currentInterim && (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <Mic className="w-16 h-16 mb-4 opacity-50" />
-            <p className="text-center">
-              Clique no botão abaixo para iniciar<br />
-              a captura de áudio em tempo real
+            <Mic className="w-12 h-12 mb-2 opacity-50" />
+            <p className="text-center text-sm">
+              Clique no botão para iniciar<br />
+              a captura de áudio
             </p>
           </div>
         )}
 
         {conversations.map((turn) => (
-          <div key={turn.id} className="space-y-3">
-            {/* Question */}
+          <div key={turn.id} className="space-y-2">
+            {/* Question - Compact */}
             <div className="flex justify-end">
-              <div className="max-w-[80%] bg-blue-600 rounded-2xl rounded-tr-sm px-4 py-3 shadow-lg">
-                <p className="text-white font-medium text-lg">{turn.original}</p>
-                <p className="text-blue-200 text-sm mt-1">{turn.translation}</p>
+              <div className="max-w-[85%] bg-blue-600 rounded-xl rounded-tr-sm px-3 py-2 shadow-lg">
+                <p className="text-white font-medium text-base">{turn.original}</p>
+                <p className="text-blue-200 text-xs mt-0.5">{turn.translation}</p>
                 <button
                   onClick={() => speakText(turn.original, sourceLanguage)}
-                  className="mt-2 text-blue-200 hover:text-white transition"
+                  className="mt-1 text-blue-200 hover:text-white transition"
                 >
-                  <Volume2 className="w-4 h-4" />
+                  <Volume2 className="w-3 h-3" />
                 </button>
               </div>
             </div>
 
-            {/* Suggested Responses */}
+            {/* Suggested Responses - Compact */}
             {turn.suggestions.map((suggestion, idx) => (
               <div key={idx} className="flex justify-start">
-                <div className="max-w-[80%] bg-gray-800 border border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 shadow-lg">
-                  <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="max-w-[85%] bg-gray-800 border border-gray-700 rounded-xl rounded-tl-sm px-3 py-2 shadow-lg">
+                  <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex-1">
-                      <p className="text-white font-medium text-lg">{suggestion.original}</p>
-                      <p className="text-gray-400 text-sm mt-1">{suggestion.translation}</p>
+                      <p className="text-white font-medium text-base">{suggestion.original}</p>
+                      <p className="text-gray-400 text-xs mt-0.5">{suggestion.translation}</p>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-1 flex-shrink-0">
                       <button
                         onClick={() => speakText(suggestion.original, sourceLanguage)}
                         className="text-green-400 hover:text-green-300 transition"
                         title="Ouvir"
                       >
-                        <Volume2 className="w-4 h-4" />
+                        <Volume2 className="w-3 h-3" />
                       </button>
                       <button
                         onClick={() => copyToClipboard(suggestion.original, `${turn.id}-${idx}`)}
@@ -301,14 +307,14 @@ export default function InterviewTranslator() {
                         title="Copiar"
                       >
                         {copiedId === `${turn.id}-${idx}` ? (
-                          <Check className="w-4 h-4" />
+                          <Check className="w-3 h-3" />
                         ) : (
-                          <Copy className="w-4 h-4" />
+                          <Copy className="w-3 h-3" />
                         )}
                       </button>
                     </div>
                   </div>
-                  <span className="text-xs text-green-500 font-medium">
+                  <span className="text-[10px] text-green-500 font-medium">
                     Sugestão {idx + 1}
                   </span>
                 </div>
@@ -319,30 +325,30 @@ export default function InterviewTranslator() {
 
         {currentInterim && (
           <div className="flex justify-end">
-            <div className="max-w-[80%] bg-blue-500/30 border border-blue-500 rounded-2xl rounded-tr-sm px-4 py-3 animate-pulse">
-              <p className="text-blue-200 italic">{currentInterim}</p>
-              <p className="text-xs text-blue-400 mt-1">Ouvindo...</p>
+            <div className="max-w-[85%] bg-blue-500/30 border border-blue-500 rounded-xl rounded-tr-sm px-3 py-2 animate-pulse">
+              <p className="text-blue-200 italic text-sm">{currentInterim}</p>
+              <p className="text-[10px] text-blue-400 mt-0.5">Ouvindo...</p>
             </div>
           </div>
         )}
 
         {isProcessing && (
           <div className="flex justify-start">
-            <div className="max-w-[80%] bg-gray-800 border border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3">
+            <div className="max-w-[85%] bg-gray-800 border border-gray-700 rounded-xl rounded-tl-sm px-3 py-2">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" />
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}} />
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
-                <p className="text-gray-400 text-sm ml-2">Gerando respostas...</p>
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" />
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}} />
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+                <p className="text-gray-400 text-xs ml-1">Gerando respostas...</p>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Bottom Controls */}
-      <div className="bg-gray-800 border-t border-gray-700 px-4 py-3 flex-shrink-0">
-        <div className="flex items-center gap-3">
+      {/* Fixed Bottom Controls */}
+      <div className="bg-gray-800 border-t border-gray-700 px-3 py-2 flex-shrink-0 sticky bottom-0">
+        <div className="flex items-center gap-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -352,21 +358,21 @@ export default function InterviewTranslator() {
           />
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="p-3 bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 transition"
+            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 transition"
             title="Upload PDF"
           >
-            <Upload className="w-5 h-5" />
+            <Upload className="w-4 h-4" />
           </button>
           <button
             onClick={handleURLAdd}
-            className="p-3 bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 transition"
+            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 transition"
             title="Adicionar Link"
           >
-            <LinkIcon className="w-5 h-5" />
+            <LinkIcon className="w-4 h-4" />
           </button>
           <button
             onClick={toggleListening}
-            className={`flex-1 py-4 px-6 rounded-full font-semibold text-white transition flex items-center justify-center gap-3 ${
+            className={`flex-1 py-2.5 px-4 rounded-full font-semibold text-white transition flex items-center justify-center gap-2 text-sm ${
               isListening
                 ? 'bg-red-600 hover:bg-red-700 animate-pulse'
                 : 'bg-green-600 hover:bg-green-700'
@@ -374,13 +380,13 @@ export default function InterviewTranslator() {
           >
             {isListening ? (
               <>
-                <MicOff className="w-6 h-6" />
-                Parar Gravação
+                <MicOff className="w-5 h-5" />
+                Parar
               </>
             ) : (
               <>
-                <Mic className="w-6 h-6" />
-                Iniciar Gravação
+                <Mic className="w-5 h-5" />
+                Iniciar
               </>
             )}
           </button>
