@@ -1,49 +1,46 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Upload, Link as LinkIcon, FileText, Globe, Volume2, Settings } from 'lucide-react';
+import { Mic, MicOff, Settings, Upload, LinkIcon, FileText, X, Volume2, Copy, Check } from 'lucide-react';
 import SpeechRecognitionService, { TranscriptResult } from '@/lib/speechRecognition';
 import TranslationService from '@/lib/translationService';
-import ResponseGenerator from '@/lib/responseGenerator';
+import ResponseGenerator, { ResponseSuggestion } from '@/lib/responseGenerator';
 import ContextExtractor, { ExtractedContext } from '@/lib/contextExtractor';
-import TranscriptPanel from './TranscriptPanel';
-import ResponsePanel from './ResponsePanel';
-import ContextPanel from './ContextPanel';
-import LanguageSelector from './LanguageSelector';
 import SettingsPanel, { AIConfig } from './SettingsPanel';
 
-interface TranscriptEntry {
+interface ConversationTurn {
   id: string;
   original: string;
   translation: string;
   timestamp: number;
-  isFinal: boolean;
+  suggestions: ResponseSuggestion[];
 }
 
 export default function InterviewTranslator() {
   const [isListening, setIsListening] = useState(false);
-  const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
+  const [conversations, setConversations] = useState<ConversationTurn[]>([]);
   const [currentInterim, setCurrentInterim] = useState<string>('');
   const [contexts, setContexts] = useState<ExtractedContext[]>([]);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [sourceLanguage, setSourceLanguage] = useState('en');
   const [targetLanguage, setTargetLanguage] = useState('pt-BR');
   const [learningLevel, setLearningLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showApiWarning, setShowApiWarning] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [aiConfig, setAiConfig] = useState<AIConfig>({
     provider: 'openai',
     apiKey: '',
     model: 'gpt-4-turbo-preview',
   });
-  const [showApiWarning, setShowApiWarning] = useState(true);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionService | null>(null);
   const translationRef = useRef<TranslationService>(new TranslationService());
   const responseGenRef = useRef<ResponseGenerator>(new ResponseGenerator());
   const contextExtractorRef = useRef<ContextExtractor>(new ContextExtractor());
 
-  // Load AI config from localStorage on mount
   useEffect(() => {
     const savedConfig = localStorage.getItem('aiConfig');
     if (savedConfig) {
@@ -59,7 +56,6 @@ export default function InterviewTranslator() {
 
   useEffect(() => {
     recognitionRef.current = new SpeechRecognitionService(sourceLanguage);
-
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
@@ -67,11 +63,17 @@ export default function InterviewTranslator() {
     };
   }, [sourceLanguage]);
 
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [conversations, currentInterim]);
+
   const handleTranscriptResult = async (result: TranscriptResult) => {
     if (result.isFinal) {
       setCurrentInterim('');
+      setIsProcessing(true);
 
-      // Translate the final transcript
       try {
         const translation = await translationRef.current.translate(
           result.text,
@@ -79,42 +81,31 @@ export default function InterviewTranslator() {
           targetLanguage
         );
 
-        const entry: TranscriptEntry = {
+        const combinedContext = await contextExtractorRef.current.combineContexts(contexts);
+        const suggestions = await responseGenRef.current.generateResponse(
+          result.text,
+          combinedContext,
+          sourceLanguage,
+          targetLanguage,
+          learningLevel
+        );
+
+        const turn: ConversationTurn = {
           id: Date.now().toString(),
           original: result.text,
           translation: translation.translatedText,
           timestamp: result.timestamp,
-          isFinal: true,
+          suggestions: suggestions || [],
         };
 
-        setTranscripts(prev => [...prev, entry]);
-
-        // Generate response suggestions
-        generateResponses(result.text);
+        setConversations(prev => [...prev, turn]);
       } catch (error) {
-        console.error('Translation error:', error);
+        console.error('Processing error:', error);
+      } finally {
+        setIsProcessing(false);
       }
     } else {
       setCurrentInterim(result.text);
-    }
-  };
-
-  const generateResponses = async (question: string) => {
-    setIsProcessing(true);
-    try {
-      const combinedContext = await contextExtractorRef.current.combineContexts(contexts);
-      const responses = await responseGenRef.current.generateResponse(
-        question,
-        combinedContext,
-        sourceLanguage,
-        targetLanguage,
-        learningLevel
-      );
-      setSuggestions(responses);
-    } catch (error) {
-      console.error('Response generation error:', error);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -133,16 +124,23 @@ export default function InterviewTranslator() {
     }
   };
 
-  const handlePDFUpload = async (file: File) => {
+  const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     try {
       const context = await contextExtractorRef.current.extractFromPDF(file);
       setContexts(prev => [...prev, context]);
     } catch (error) {
       console.error('PDF upload error:', error);
     }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleURLAdd = async (url: string) => {
+  const handleURLAdd = async () => {
+    const url = prompt('Cole o link (Canva, LinkedIn, etc.):');
+    if (!url) return;
+
     try {
       const context = await contextExtractorRef.current.extractFromURL(url);
       setContexts(prev => [...prev, context]);
@@ -163,6 +161,16 @@ export default function InterviewTranslator() {
     }
   };
 
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
   const handleSaveConfig = (config: AIConfig) => {
     setAiConfig(config);
     localStorage.setItem('aiConfig', JSON.stringify(config));
@@ -173,147 +181,197 @@ export default function InterviewTranslator() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <header className="text-center mb-8 relative">
-        <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-2">
-          Tradutor de Entrevistas em Tempo Real
-        </h1>
-        <p className="text-gray-600 dark:text-gray-300">
-          Transcrição, tradução e sugestões de resposta para iniciantes
-        </p>
+    <div className="h-screen flex flex-col bg-gray-900">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-white">Tradutor de Entrevistas</h1>
+            <p className="text-sm text-gray-400">
+              {sourceLanguage === 'en' ? '🇺🇸 Inglês' : '🇧🇷 Português'} → {targetLanguage === 'pt-BR' ? '🇧🇷 Português' : '🇺🇸 Inglês'}
+            </p>
+          </div>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
 
-        {/* Settings Button */}
-        <button
-          onClick={() => setIsSettingsOpen(true)}
-          className="absolute top-0 right-0 p-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition flex items-center gap-2"
-          title="Configurações da API"
-        >
-          <Settings className="w-5 h-5" />
-          <span className="hidden sm:inline text-sm font-medium">Configurar API</span>
-        </button>
+        {showApiWarning && (
+          <div className="mt-2 bg-yellow-900/50 border border-yellow-700 rounded-lg p-2 flex items-center justify-between">
+            <p className="text-xs text-yellow-300">⚠️ Configure sua API Key</p>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="text-xs bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded"
+            >
+              Configurar
+            </button>
+          </div>
+        )}
       </header>
 
-      {/* API Warning Banner */}
-      {showApiWarning && (
-        <div className="mb-6 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-4 rounded-lg">
-          <div className="flex items-start">
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
-                ⚠️ Configuração Necessária
-              </h3>
-              <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-2">
-                Configure sua chave da API para usar tradução e geração de respostas IA.
-              </p>
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium transition"
+      {/* Context Pills */}
+      {contexts.length > 0 && (
+        <div className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex-shrink-0">
+          <div className="flex flex-wrap gap-2">
+            {contexts.map((ctx, idx) => (
+              <div
+                key={idx}
+                className="bg-blue-900/50 border border-blue-700 rounded-full px-3 py-1 flex items-center gap-2 group"
               >
-                Configurar Agora
-              </button>
-            </div>
-            <button
-              onClick={() => setShowApiWarning(false)}
-              className="text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-200 ml-4"
-            >
-              ✕
-            </button>
+                <FileText className="w-3 h-3 text-blue-400" />
+                <span className="text-xs text-blue-300">{ctx.source.name}</span>
+                <button
+                  onClick={() => removeContext(idx)}
+                  className="text-blue-400 hover:text-red-400 transition opacity-0 group-hover:opacity-100"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Panel - Controls and Context */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Language Selection */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Globe className="w-5 h-5" />
-              Idiomas
-            </h2>
-            <LanguageSelector
-              sourceLanguage={sourceLanguage}
-              targetLanguage={targetLanguage}
-              onSourceChange={setSourceLanguage}
-              onTargetChange={setTargetLanguage}
-            />
+      {/* Conversation Area */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        {conversations.length === 0 && !currentInterim && (
+          <div className="flex flex-col items-center justify-center h-full text-gray-500">
+            <Mic className="w-16 h-16 mb-4 opacity-50" />
+            <p className="text-center">
+              Clique no botão abaixo para iniciar<br />
+              a captura de áudio em tempo real
+            </p>
+          </div>
+        )}
 
-            <div className="mt-4">
-              <label className="block text-sm font-medium mb-2">
-                Nível de Aprendizado
-              </label>
-              <select
-                value={learningLevel}
-                onChange={(e) => setLearningLevel(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="beginner">Iniciante (A1-A2)</option>
-                <option value="intermediate">Intermediário (B1-B2)</option>
-                <option value="advanced">Avançado (C1-C2)</option>
-              </select>
+        {conversations.map((turn) => (
+          <div key={turn.id} className="space-y-3">
+            {/* Question */}
+            <div className="flex justify-end">
+              <div className="max-w-[80%] bg-blue-600 rounded-2xl rounded-tr-sm px-4 py-3 shadow-lg">
+                <p className="text-white font-medium text-lg">{turn.original}</p>
+                <p className="text-blue-200 text-sm mt-1">{turn.translation}</p>
+                <button
+                  onClick={() => speakText(turn.original, sourceLanguage)}
+                  className="mt-2 text-blue-200 hover:text-white transition"
+                >
+                  <Volume2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Suggested Responses */}
+            {turn.suggestions.map((suggestion, idx) => (
+              <div key={idx} className="flex justify-start">
+                <div className="max-w-[80%] bg-gray-800 border border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 shadow-lg">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex-1">
+                      <p className="text-white font-medium text-lg">{suggestion.original}</p>
+                      <p className="text-gray-400 text-sm mt-1">{suggestion.translation}</p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => speakText(suggestion.original, sourceLanguage)}
+                        className="text-green-400 hover:text-green-300 transition"
+                        title="Ouvir"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => copyToClipboard(suggestion.original, `${turn.id}-${idx}`)}
+                        className="text-green-400 hover:text-green-300 transition"
+                        title="Copiar"
+                      >
+                        {copiedId === `${turn.id}-${idx}` ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <span className="text-xs text-green-500 font-medium">
+                    Sugestão {idx + 1}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+
+        {currentInterim && (
+          <div className="flex justify-end">
+            <div className="max-w-[80%] bg-blue-500/30 border border-blue-500 rounded-2xl rounded-tr-sm px-4 py-3 animate-pulse">
+              <p className="text-blue-200 italic">{currentInterim}</p>
+              <p className="text-xs text-blue-400 mt-1">Ouvindo...</p>
             </div>
           </div>
+        )}
 
-          {/* Recording Control */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <button
-              onClick={toggleListening}
-              className={`w-full py-4 px-6 rounded-lg font-semibold text-white transition-all duration-200 flex items-center justify-center gap-3 ${
-                isListening
-                  ? 'bg-red-500 hover:bg-red-600 animate-pulse'
-                  : 'bg-blue-500 hover:bg-blue-600'
-              }`}
-            >
-              {isListening ? (
-                <>
-                  <MicOff className="w-6 h-6" />
-                  Parar Gravação
-                </>
-              ) : (
-                <>
-                  <Mic className="w-6 h-6" />
-                  Iniciar Gravação
-                </>
-              )}
-            </button>
-            {isListening && (
-              <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-2">
-                Ouvindo... Fale naturalmente
-              </p>
-            )}
+        {isProcessing && (
+          <div className="flex justify-start">
+            <div className="max-w-[80%] bg-gray-800 border border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}} />
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}} />
+                <p className="text-gray-400 text-sm ml-2">Gerando respostas...</p>
+              </div>
+            </div>
           </div>
+        )}
+      </div>
 
-          {/* Context Panel */}
-          <ContextPanel
-            contexts={contexts}
-            onPDFUpload={handlePDFUpload}
-            onURLAdd={handleURLAdd}
-            onRemove={removeContext}
+      {/* Bottom Controls */}
+      <div className="bg-gray-800 border-t border-gray-700 px-4 py-3 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf"
+            onChange={handlePDFUpload}
+            className="hidden"
           />
-        </div>
-
-        {/* Middle Panel - Transcript */}
-        <div className="lg:col-span-1">
-          <TranscriptPanel
-            transcripts={transcripts}
-            currentInterim={currentInterim}
-            sourceLanguage={sourceLanguage}
-            targetLanguage={targetLanguage}
-            onSpeak={speakText}
-          />
-        </div>
-
-        {/* Right Panel - Response Suggestions */}
-        <div className="lg:col-span-1">
-          <ResponsePanel
-            suggestions={suggestions}
-            isProcessing={isProcessing}
-            sourceLanguage={sourceLanguage}
-            onSpeak={speakText}
-          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-3 bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 transition"
+            title="Upload PDF"
+          >
+            <Upload className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleURLAdd}
+            className="p-3 bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 transition"
+            title="Adicionar Link"
+          >
+            <LinkIcon className="w-5 h-5" />
+          </button>
+          <button
+            onClick={toggleListening}
+            className={`flex-1 py-4 px-6 rounded-full font-semibold text-white transition flex items-center justify-center gap-3 ${
+              isListening
+                ? 'bg-red-600 hover:bg-red-700 animate-pulse'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
+          >
+            {isListening ? (
+              <>
+                <MicOff className="w-6 h-6" />
+                Parar Gravação
+              </>
+            ) : (
+              <>
+                <Mic className="w-6 h-6" />
+                Iniciar Gravação
+              </>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Settings Panel */}
       <SettingsPanel
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
