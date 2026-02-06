@@ -29,9 +29,9 @@ export default function InterviewTranslator() {
   const [showApiWarning, setShowApiWarning] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [aiConfig, setAiConfig] = useState<AIConfig>({
-    provider: 'openai',
+    provider: 'google',
     apiKey: '',
-    model: 'gpt-4o',
+    model: 'gemini-3-flash-preview',
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);

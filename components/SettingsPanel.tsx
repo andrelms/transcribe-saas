@@ -31,12 +31,14 @@ const PROVIDER_MODELS = {
     { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
   ],
   google: [
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview (Prioridade 1)' },
+    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview (Prioridade 2)' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Prioridade 3)' },
+    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite (Prioridade 4)' },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Prioridade 5)' },
     { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Experimental)' },
-    { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Mais Recente)' },
-    { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash (Mais Recente)' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-    { id: 'gemini-pro', name: 'Gemini 1.0 Pro' },
+    { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Latest)' },
+    { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash (Latest)' },
   ],
 };
 
