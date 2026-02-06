@@ -18,18 +18,25 @@ interface SettingsPanelProps {
 
 const PROVIDER_MODELS = {
   openai: [
-    { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo' },
+    { id: 'gpt-4o', name: 'GPT-4o (Mais Recente)' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
     { id: 'gpt-4', name: 'GPT-4' },
     { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
   ],
   anthropic: [
+    { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Mais Recente)' },
     { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
     { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
     { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
   ],
   google: [
-    { id: 'gemini-pro', name: 'Gemini Pro' },
-    { id: 'gemini-pro-vision', name: 'Gemini Pro Vision' },
+    { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Experimental)' },
+    { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Mais Recente)' },
+    { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash (Mais Recente)' },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+    { id: 'gemini-pro', name: 'Gemini 1.0 Pro' },
   ],
 };
 

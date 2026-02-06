@@ -31,7 +31,7 @@ export default function InterviewTranslator() {
   const [aiConfig, setAiConfig] = useState<AIConfig>({
     provider: 'openai',
     apiKey: '',
-    model: 'gpt-4-turbo-preview',
+    model: 'gpt-4o',
   });
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -70,18 +70,24 @@ export default function InterviewTranslator() {
   }, [conversations, currentInterim]);
 
   const handleTranscriptResult = async (result: TranscriptResult) => {
+    console.log('📝 Transcrição recebida:', result.text, 'Final:', result.isFinal);
+
     if (result.isFinal) {
       setCurrentInterim('');
       setIsProcessing(true);
+      console.log('🔄 Processando frase final:', result.text);
 
       try {
+        console.log('🌐 Traduzindo...');
         const translation = await translationRef.current.translate(
           result.text,
           sourceLanguage,
           targetLanguage
         );
+        console.log('✅ Tradução:', translation.translatedText);
 
         const combinedContext = await contextExtractorRef.current.combineContexts(contexts);
+        console.log('🤖 Gerando respostas com contexto...');
         const suggestions = await responseGenRef.current.generateResponse(
           result.text,
           combinedContext,
@@ -89,6 +95,7 @@ export default function InterviewTranslator() {
           targetLanguage,
           learningLevel
         );
+        console.log('✅ Sugestões geradas:', suggestions.length);
 
         const turn: ConversationTurn = {
           id: Date.now().toString(),
@@ -100,7 +107,8 @@ export default function InterviewTranslator() {
 
         setConversations(prev => [...prev, turn]);
       } catch (error) {
-        console.error('Processing error:', error);
+        console.error('❌ Erro no processamento:', error);
+        alert(`Erro: ${error}\n\nVerifique se configurou a API Key!`);
       } finally {
         setIsProcessing(false);
       }
@@ -110,14 +118,21 @@ export default function InterviewTranslator() {
   };
 
   const toggleListening = () => {
-    if (!recognitionRef.current) return;
+    if (!recognitionRef.current) {
+      alert('⚠️ Web Speech API não disponível. Use Chrome ou Edge!');
+      return;
+    }
 
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
+      console.log('🛑 Gravação parada');
     } else {
+      console.log('🎤 Iniciando gravação...');
+      console.log('Idioma configurado:', sourceLanguage);
       recognitionRef.current.start(handleTranscriptResult, (error) => {
-        console.error('Speech recognition error:', error);
+        console.error('❌ Erro na transcrição:', error);
+        alert(`Erro na transcrição: ${error}\n\nVerifique:\n1. Permissão do microfone\n2. Use Chrome ou Edge\n3. HTTPS ou localhost`);
         setIsListening(false);
       });
       setIsListening(true);
