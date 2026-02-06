@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Settings, Eye, EyeOff, Save, X } from 'lucide-react';
 
 export interface AIConfig {
-  provider: 'openai' | 'anthropic' | 'google';
+  provider: 'openai' | 'anthropic' | 'google' | 'ollama';
   apiKey: string;
   model: string;
 }
@@ -16,7 +16,7 @@ interface SettingsPanelProps {
   currentConfig: AIConfig;
 }
 
-const PROVIDER_MODELS = {
+const PROVIDER_MODELS: Record<string, { id: string; name: string }[]> = {
   openai: [
     { id: 'gpt-4o', name: 'GPT-4o (Mais Recente)' },
     { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
@@ -40,6 +40,7 @@ const PROVIDER_MODELS = {
     { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro (Latest)' },
     { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash (Latest)' },
   ],
+  ollama: [], // Will be loaded dynamically
 };
 
 export default function SettingsPanel({
@@ -51,10 +52,51 @@ export default function SettingsPanel({
   const [config, setConfig] = useState<AIConfig>(currentConfig);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [ollamaModels, setOllamaModels] = useState<{ id: string; name: string }[]>([]);
+  const [ollamaAvailable, setOllamaAvailable] = useState(false);
+  const [loadingOllama, setLoadingOllama] = useState(false);
 
   useEffect(() => {
     setConfig(currentConfig);
   }, [currentConfig]);
+
+  // Load Ollama models when panel opens
+  useEffect(() => {
+    if (isOpen) {
+      loadOllamaModels();
+    }
+  }, [isOpen]);
+
+  const loadOllamaModels = async () => {
+    setLoadingOllama(true);
+    try {
+      const response = await fetch('/api/ollama/models');
+      const data = await response.json();
+
+      if (data.available && data.models) {
+        setOllamaAvailable(true);
+        setOllamaModels(
+          data.models.map((m: any) => ({
+            id: m.name,
+            name: `${m.name} (${(m.size / 1e9).toFixed(1)}GB)`,
+          }))
+        );
+        PROVIDER_MODELS.ollama = data.models.map((m: any) => ({
+          id: m.name,
+          name: `${m.name} (${(m.size / 1e9).toFixed(1)}GB)`,
+        }));
+      } else {
+        setOllamaAvailable(false);
+        setOllamaModels([]);
+      }
+    } catch (error) {
+      console.error('Failed to load Ollama models:', error);
+      setOllamaAvailable(false);
+      setOllamaModels([]);
+    } finally {
+      setLoadingOllama(false);
+    }
+  };
 
   const handleSave = () => {
     setIsSaving(true);
@@ -73,6 +115,8 @@ export default function SettingsPanel({
         return 'sk-ant-...';
       case 'google':
         return 'AIza...';
+      case 'ollama':
+        return 'Não necessário (modelo local)';
       default:
         return 'Cole sua chave API aqui';
     }
@@ -86,9 +130,15 @@ export default function SettingsPanel({
         return 'Anthropic (Claude)';
       case 'google':
         return 'Google (Gemini)';
+      case 'ollama':
+        return '🦙 Ollama (Local)';
       default:
         return provider;
     }
+  };
+
+  const requiresApiKey = (provider: string) => {
+    return provider !== 'ollama';
   };
 
   if (!isOpen) return null;
@@ -123,10 +173,12 @@ export default function SettingsPanel({
               value={config.provider}
               onChange={(e) => {
                 const newProvider = e.target.value as AIConfig['provider'];
+                const models = PROVIDER_MODELS[newProvider];
                 setConfig({
                   ...config,
                   provider: newProvider,
-                  model: PROVIDER_MODELS[newProvider][0].id,
+                  model: models && models.length > 0 ? models[0].id : '',
+                  apiKey: newProvider === 'ollama' ? 'local' : config.apiKey,
                 });
               }}
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -134,6 +186,9 @@ export default function SettingsPanel({
               <option value="openai">{getProviderName('openai')}</option>
               <option value="anthropic">{getProviderName('anthropic')}</option>
               <option value="google">{getProviderName('google')}</option>
+              <option value="ollama" disabled={!ollamaAvailable}>
+                {getProviderName('ollama')} {!ollamaAvailable && '(Não disponível)'}
+              </option>
             </select>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Escolha o provedor de IA que você deseja usar
@@ -162,39 +217,41 @@ export default function SettingsPanel({
           </div>
 
           {/* API Key Input */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Chave da API
-            </label>
-            <div className="relative">
-              <input
-                type={showApiKey ? 'text' : 'password'}
-                value={config.apiKey}
-                onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-                placeholder={getApiKeyPlaceholder()}
-                className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-              >
-                {showApiKey ? (
-                  <EyeOff className="w-5 h-5" />
-                ) : (
-                  <Eye className="w-5 h-5" />
-                )}
-              </button>
+          {requiresApiKey(config.provider) && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Chave da API
+              </label>
+              <div className="relative">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={config.apiKey}
+                  onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
+                  placeholder={getApiKeyPlaceholder()}
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  {showApiKey ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Sua chave é armazenada localmente no navegador e nunca é compartilhada
+              </p>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Sua chave é armazenada localmente no navegador e nunca é compartilhada
-            </p>
-          </div>
+          )}
 
           {/* Instructions */}
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">
-              Como obter sua chave da API:
+              {config.provider === 'ollama' ? 'Como usar Ollama:' : 'Como obter sua chave da API:'}
             </h3>
             <ul className="text-xs text-blue-800 dark:text-blue-400 space-y-1">
               {config.provider === 'openai' && (
@@ -219,6 +276,15 @@ export default function SettingsPanel({
                   <li>2. Faça login com sua conta Google</li>
                   <li>3. Crie uma chave API</li>
                   <li>4. Copie e cole acima</li>
+                </>
+              )}
+              {config.provider === 'ollama' && (
+                <>
+                  <li>🦙 <strong>Ollama detectado com {ollamaModels.length} modelo(s) instalado(s)</strong></li>
+                  <li>✅ Nenhuma chave API necessária - roda 100% local e gratuito</li>
+                  <li>📦 Para instalar mais modelos: <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">ollama pull llama2</code></li>
+                  <li>📋 Ver modelos: <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">ollama list</code></li>
+                  <li>📖 Mais info: <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer" className="underline">ollama.ai</a></li>
                 </>
               )}
             </ul>

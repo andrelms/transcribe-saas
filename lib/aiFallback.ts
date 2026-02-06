@@ -18,6 +18,13 @@ export async function callAIWithFallback(
   temperature: number = 0.7,
   responseFormat?: { type: string }
 ): Promise<any> {
+  // For Ollama local models
+  if (provider === 'ollama') {
+    const { callOllama } = await import('./ollamaService');
+    console.log('🦙 Using Ollama local model:', initialModel);
+    return await callOllama(initialModel, messages, temperature, responseFormat?.type === 'json_object');
+  }
+
   // For Google provider, try fallback models if initial model fails
   if (provider === 'google') {
     const modelsToTry = [initialModel, ...GEMINI_FALLBACK_ORDER.filter(m => m !== initialModel)];
