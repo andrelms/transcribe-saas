@@ -22,8 +22,13 @@ export class SystemAudioCapture {
 
   // Buffer for audio chunks
   private audioChunks: Float32Array[] = [];
-  private bufferDuration: number = 3000; // 3 seconds
+  private bufferDuration: number = 5000; // Increased to 5 seconds for longer phrases
+  private minBufferDuration: number = 2000; // Minimum 2 seconds
+  private maxBufferDuration: number = 10000; // Maximum 10 seconds
   private lastTranscriptTime: number = 0;
+  private silenceThreshold: number = 0.01; // Amplitude threshold for silence detection
+  private silenceDuration: number = 0; // Track silence duration
+  private isSpeaking: boolean = false;
 
   constructor(language: string = 'pt-BR') {
     this.language = language;
@@ -85,12 +90,33 @@ export class SystemAudioCapture {
         const chunk = new Float32Array(inputData);
         this.audioChunks.push(chunk);
 
-        // Check if we have enough audio to transcribe (3 seconds)
+        // Detect if there's speech or silence
+        const rms = this.calculateRMS(inputData);
+        const isSilent = rms < this.silenceThreshold;
+
+        if (!isSilent) {
+          this.isSpeaking = true;
+          this.silenceDuration = 0;
+        } else if (this.isSpeaking) {
+          this.silenceDuration += (inputData.length / 16000) * 1000; // ms
+        }
+
+        // Check if we should transcribe
         const totalSamples = this.audioChunks.reduce((sum, c) => sum + c.length, 0);
         const durationMs = (totalSamples / 16000) * 1000;
 
-        if (durationMs >= this.bufferDuration) {
+        // Transcribe if:
+        // 1. We have minimum buffer AND detected silence for 800ms (natural pause)
+        // 2. OR we reached maximum buffer duration (prevent overflow)
+        const shouldTranscribe =
+          (durationMs >= this.minBufferDuration && this.silenceDuration >= 800) ||
+          durationMs >= this.maxBufferDuration;
+
+        if (shouldTranscribe && this.audioChunks.length > 0) {
+          console.log(`📊 Transcrevendo após ${durationMs.toFixed(0)}ms (silêncio: ${this.silenceDuration.toFixed(0)}ms)`);
           this.transcribeBuffer();
+          this.isSpeaking = false;
+          this.silenceDuration = 0;
         }
       };
 
@@ -173,6 +199,14 @@ export class SystemAudioCapture {
         this.onErrorCallback(`Falha na transcrição: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
+  }
+
+  private calculateRMS(buffer: Float32Array): number {
+    let sum = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      sum += buffer[i] * buffer[i];
+    }
+    return Math.sqrt(sum / buffer.length);
   }
 
   private audioBufferToWav(buffer: Float32Array, sampleRate: number): Blob {

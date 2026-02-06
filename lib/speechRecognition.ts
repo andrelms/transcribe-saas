@@ -40,6 +40,12 @@ export class SpeechRecognitionService {
     this.recognition.lang = this.language;
     this.recognition.maxAlternatives = 1;
 
+    // Enable automatic punctuation for better phrase detection
+    if ('webkitSpeechRecognition' in window) {
+      // Chrome-specific settings for better long phrase handling
+      this.recognition.interimResults = true;
+    }
+
     console.log('🎤 Configuração:', {
       continuous: true,
       interimResults: true,
@@ -52,21 +58,41 @@ export class SpeechRecognitionService {
 
     this.recognition.onresult = (event: any) => {
       console.log('📝 Evento de resultado recebido');
+
+      // Process all results from the event
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const transcript = result[0].transcript;
         const isFinal = result.isFinal;
         const confidence = result[0].confidence;
 
-        console.log(`${isFinal ? '✅ FINAL' : '⏳ Interim'}:`, transcript);
+        console.log(`${isFinal ? '✅ FINAL' : '⏳ Interim'}:`, transcript, `(${transcript.length} chars)`);
 
         if (this.onResultCallback) {
-          this.onResultCallback({
-            text: transcript,
-            isFinal,
-            timestamp: Date.now(),
-            confidence: confidence || 0,
-          });
+          // For very long transcripts (>200 chars), split into smaller chunks
+          if (isFinal && transcript.length > 200) {
+            console.log('📏 Frase longa detectada, processando em partes...');
+            const chunks = this.splitIntoSentences(transcript);
+            chunks.forEach((chunk, idx) => {
+              if (chunk.trim() && this.onResultCallback) {
+                console.log(`📤 Enviando parte ${idx + 1}/${chunks.length}:`, chunk);
+                this.onResultCallback({
+                  text: chunk.trim(),
+                  isFinal: true,
+                  timestamp: Date.now() + idx * 100, // Slight delay between chunks
+                  confidence: confidence || 0,
+                });
+              }
+            });
+          } else {
+            // Normal processing
+            this.onResultCallback({
+              text: transcript,
+              isFinal,
+              timestamp: Date.now(),
+              confidence: confidence || 0,
+            });
+          }
         }
       }
     };
@@ -134,6 +160,35 @@ export class SpeechRecognitionService {
 
   isActive() {
     return this.isListening;
+  }
+
+  private splitIntoSentences(text: string): string[] {
+    // Split by sentence endings (., !, ?, ... etc) but keep reasonable chunks
+    // Also split on commas if sentences are still too long
+    const sentences: string[] = [];
+
+    // First split by major punctuation
+    const majorSplits = text.split(/([.!?]+\s+)/);
+    let currentChunk = '';
+
+    for (let i = 0; i < majorSplits.length; i++) {
+      currentChunk += majorSplits[i];
+
+      // If chunk is getting long (>150 chars) or we hit a sentence end, flush it
+      if (currentChunk.length > 150 || /[.!?]+\s+$/.test(currentChunk)) {
+        if (currentChunk.trim()) {
+          sentences.push(currentChunk.trim());
+          currentChunk = '';
+        }
+      }
+    }
+
+    // Add any remaining text
+    if (currentChunk.trim()) {
+      sentences.push(currentChunk.trim());
+    }
+
+    return sentences.length > 0 ? sentences : [text];
   }
 }
 
