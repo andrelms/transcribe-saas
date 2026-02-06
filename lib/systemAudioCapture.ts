@@ -131,6 +131,9 @@ export class SystemAudioCapture {
 
     try {
       console.log('🌐 Enviando áudio para transcrição...');
+      console.log('📊 Tamanho do áudio:', wavBlob.size, 'bytes');
+      console.log('🔑 API Key configurada:', !!this.apiKey);
+      console.log('🤖 Provider:', this.provider);
 
       // Send to transcription API
       const formData = new FormData();
@@ -146,7 +149,9 @@ export class SystemAudioCapture {
       });
 
       if (!response.ok) {
-        throw new Error('Transcription failed');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Erro HTTP:', response.status, errorData);
+        throw new Error(`Transcription API error: ${response.status} - ${JSON.stringify(errorData)}`);
       }
 
       const data = await response.json();
@@ -159,11 +164,13 @@ export class SystemAudioCapture {
           timestamp: Date.now(),
           confidence: data.confidence || 0.9,
         });
+      } else {
+        console.log('⚠️ Transcrição vazia ou sem conteúdo');
       }
     } catch (error) {
-      console.error('❌ Erro na transcrição:', error);
+      console.error('❌ Erro detalhado na transcrição:', error);
       if (this.onErrorCallback) {
-        this.onErrorCallback('Falha na transcrição do áudio');
+        this.onErrorCallback(`Falha na transcrição: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
   }
