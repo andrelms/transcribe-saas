@@ -47,8 +47,9 @@ export class SystemAudioCapture {
 
     try {
       // Request screen/tab capture with audio
+      // NOTE: getDisplayMedia REQUIRES video=true even for audio-only capture
       this.mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        video: false,
+        video: true, // Required by API, we'll just ignore the video track
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
@@ -56,6 +57,10 @@ export class SystemAudioCapture {
           sampleRate: 16000, // Whisper works well with 16kHz
         } as any,
       });
+
+      // Stop video track immediately since we only want audio
+      const videoTracks = this.mediaStream.getVideoTracks();
+      videoTracks.forEach(track => track.stop());
 
       console.log('✅ Stream de áudio capturado');
 
