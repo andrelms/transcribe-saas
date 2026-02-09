@@ -68,31 +68,15 @@ export class SpeechRecognitionService {
 
         console.log(`${isFinal ? '✅ FINAL' : '⏳ Interim'}:`, transcript, `(${transcript.length} chars)`);
 
-        if (this.onResultCallback) {
-          // For very long transcripts (>200 chars), split into smaller chunks
-          if (isFinal && transcript.length > 200) {
-            console.log('📏 Frase longa detectada, processando em partes...');
-            const chunks = this.splitIntoSentences(transcript);
-            chunks.forEach((chunk, idx) => {
-              if (chunk.trim() && this.onResultCallback) {
-                console.log(`📤 Enviando parte ${idx + 1}/${chunks.length}:`, chunk);
-                this.onResultCallback({
-                  text: chunk.trim(),
-                  isFinal: true,
-                  timestamp: Date.now() + idx * 100, // Slight delay between chunks
-                  confidence: confidence || 0,
-                });
-              }
-            });
-          } else {
-            // Normal processing
-            this.onResultCallback({
-              text: transcript,
-              isFinal,
-              timestamp: Date.now(),
-              confidence: confidence || 0,
-            });
-          }
+        // Send all results (interim and final) without splitting
+        // This allows real-time composition like Google Translate
+        if (this.onResultCallback && transcript.trim()) {
+          this.onResultCallback({
+            text: transcript,
+            isFinal,
+            timestamp: Date.now(),
+            confidence: confidence || 0,
+          });
         }
       }
     };

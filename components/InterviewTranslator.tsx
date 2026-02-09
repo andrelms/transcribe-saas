@@ -22,6 +22,7 @@ export default function InterviewTranslator() {
   const [isListening, setIsListening] = useState(false);
   const [conversations, setConversations] = useState<ConversationTurn[]>([]);
   const [currentInterim, setCurrentInterim] = useState<string>('');
+  const [currentInterimTranslation, setCurrentInterimTranslation] = useState<string>('');
   const [contexts, setContexts] = useState<ExtractedContext[]>([]);
   const [sourceLanguage, setSourceLanguage] = useState('en');
   const [targetLanguage, setTargetLanguage] = useState('pt-BR');
@@ -47,6 +48,7 @@ export default function InterviewTranslator() {
   const translationRef = useRef<TranslationService>(new TranslationService());
   const responseGenRef = useRef<ResponseGenerator>(new ResponseGenerator());
   const contextExtractorRef = useRef<ContextExtractor>(new ContextExtractor());
+  const translationDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const savedConfig = localStorage.getItem('aiConfig');
@@ -71,6 +73,9 @@ export default function InterviewTranslator() {
       if (systemAudioRef.current) {
         systemAudioRef.current.stop();
       }
+      if (translationDebounceRef.current) {
+        clearTimeout(translationDebounceRef.current);
+      }
     };
   }, [sourceLanguage]);
 
@@ -84,13 +89,22 @@ export default function InterviewTranslator() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [conversations, currentInterim]);
+  }, [conversations, currentInterim, currentInterimTranslation]);
 
   const handleTranscriptResult = async (result: TranscriptResult) => {
     console.log('📝 Transcrição recebida:', result.text, 'Final:', result.isFinal);
 
     if (result.isFinal) {
+      // Clear interim states
       setCurrentInterim('');
+      setCurrentInterimTranslation('');
+
+      // Clear any pending translation debounce
+      if (translationDebounceRef.current) {
+        clearTimeout(translationDebounceRef.current);
+        translationDebounceRef.current = null;
+      }
+
       setIsProcessing(true);
       console.log('🔄 Processando frase final:', result.text);
 
@@ -130,7 +144,32 @@ export default function InterviewTranslator() {
         setIsProcessing(false);
       }
     } else {
+      // Interim result - update immediately for real-time composition
       setCurrentInterim(result.text);
+
+      // Clear previous debounce timer
+      if (translationDebounceRef.current) {
+        clearTimeout(translationDebounceRef.current);
+      }
+
+      // Debounce translation for interim results (translate after 600ms of no new input)
+      translationDebounceRef.current = setTimeout(async () => {
+        if (result.text.trim()) {
+          try {
+            console.log('🌐 Traduzindo interim:', result.text.substring(0, 50) + '...');
+            const translation = await translationRef.current.translate(
+              result.text,
+              sourceLanguage,
+              targetLanguage
+            );
+            setCurrentInterimTranslation(translation.translatedText);
+            console.log('✅ Tradução interim:', translation.translatedText.substring(0, 50) + '...');
+          } catch (error) {
+            console.error('❌ Erro na tradução interim:', error);
+            // Don't show error for interim translations
+          }
+        }
+      }, 600); // Wait 600ms before translating interim results
     }
   };
 
@@ -419,9 +458,17 @@ export default function InterviewTranslator() {
 
         {currentInterim && (
           <div className="flex justify-end">
-            <div className="max-w-[85%] bg-blue-500/30 border border-blue-500 rounded-xl rounded-tr-sm px-3 py-2 animate-pulse">
-              <p className="text-blue-200 italic text-sm">{currentInterim}</p>
-              <p className="text-[10px] text-blue-400 mt-0.5">Ouvindo...</p>
+            <div className="max-w-[85%] bg-blue-500/30 border border-blue-500 rounded-xl rounded-tr-sm px-3 py-2">
+              <p className="text-white font-medium text-base">{currentInterim}</p>
+              {currentInterimTranslation && (
+                <p className="text-blue-200 text-xs mt-1">{currentInterimTranslation}</p>
+              )}
+              <div className="flex items-center gap-1 mt-1">
+                <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse" />
+                <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}} />
+                <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}} />
+                <p className="text-[10px] text-blue-300 ml-1">Ouvindo ao vivo...</p>
+              </div>
             </div>
           </div>
         )}
