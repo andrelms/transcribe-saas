@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Settings, Upload, LinkIcon, FileText, X, Volume2, Copy, Check, Monitor } from 'lucide-react';
+import { Mic, MicOff, Settings, Upload, LinkIcon, FileText, X, Volume2, Copy, Check, Monitor, VolumeX } from 'lucide-react';
 import SpeechRecognitionService, { TranscriptResult } from '@/lib/speechRecognition';
 import SystemAudioCapture, { AudioCaptureResult } from '@/lib/systemAudioCapture';
 import TranslationService from '@/lib/translationService';
@@ -33,6 +33,7 @@ export default function InterviewTranslator() {
   const [audioSource, setAudioSource] = useState<'microphone' | 'system'>('microphone');
   const [selectedContext, setSelectedContext] = useState<ExtractedContext | null>(null);
   const [isContextModalOpen, setIsContextModalOpen] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Start muted by default
   const [aiConfig, setAiConfig] = useState<AIConfig>({
     provider: 'google',
     apiKey: '',
@@ -216,6 +217,10 @@ export default function InterviewTranslator() {
   };
 
   const speakText = (text: string, language: string) => {
+    if (isMuted) {
+      console.log('🔇 App está silenciado');
+      return;
+    }
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = language;
@@ -253,13 +258,26 @@ export default function InterviewTranslator() {
               {sourceLanguage === 'en' ? '🇺🇸' : '🇧🇷'} → {targetLanguage === 'pt-BR' ? '🇧🇷' : '🇺🇸'}
             </p>
           </div>
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition"
-            title="Configurações"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMuted(!isMuted)}
+              className={`p-2 rounded-lg transition ${
+                isMuted
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-400'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+              title={isMuted ? 'Sons desativados (clique para ativar)' : 'Sons ativados (clique para desativar)'}
+            >
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white transition"
+              title="Configurações"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {showApiWarning && (
@@ -336,12 +354,15 @@ export default function InterviewTranslator() {
               <div className="max-w-[85%] bg-blue-600 rounded-xl rounded-tr-sm px-3 py-2 shadow-lg">
                 <p className="text-white font-medium text-base">{turn.original}</p>
                 <p className="text-blue-200 text-xs mt-0.5">{turn.translation}</p>
-                <button
-                  onClick={() => speakText(turn.original, sourceLanguage)}
-                  className="mt-1 text-blue-200 hover:text-white transition"
-                >
-                  <Volume2 className="w-3 h-3" />
-                </button>
+                {!isMuted && (
+                  <button
+                    onClick={() => speakText(turn.original, sourceLanguage)}
+                    className="mt-1 text-blue-200 hover:text-white transition"
+                    title="Ouvir texto"
+                  >
+                    <Volume2 className="w-3 h-3" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -355,13 +376,15 @@ export default function InterviewTranslator() {
                       <p className="text-gray-400 text-xs mt-0.5">{suggestion.translation}</p>
                     </div>
                     <div className="flex gap-1 flex-shrink-0">
-                      <button
-                        onClick={() => speakText(suggestion.original, sourceLanguage)}
-                        className="text-green-400 hover:text-green-300 transition"
-                        title="Ouvir"
-                      >
-                        <Volume2 className="w-3 h-3" />
-                      </button>
+                      {!isMuted && (
+                        <button
+                          onClick={() => speakText(suggestion.original, sourceLanguage)}
+                          className="text-green-400 hover:text-green-300 transition"
+                          title="Ouvir"
+                        >
+                          <Volume2 className="w-3 h-3" />
+                        </button>
+                      )}
                       <button
                         onClick={() => copyToClipboard(suggestion.original, `${turn.id}-${idx}`)}
                         className="text-green-400 hover:text-green-300 transition"
