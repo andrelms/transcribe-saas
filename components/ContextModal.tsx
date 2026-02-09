@@ -72,10 +72,29 @@ export default function ContextModal({ context, isOpen, onClose }: ContextModalP
             </h3>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 max-h-96 overflow-y-auto">
               <p className="text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
-                {context.content}
+                {context.text}
               </p>
             </div>
           </div>
+
+          {/* Key Points */}
+          {context.keyPoints && context.keyPoints.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-yellow-400 mb-2 flex items-center gap-2">
+                🎯 Pontos Principais
+              </h3>
+              <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                <ul className="space-y-2">
+                  {context.keyPoints.map((point, idx) => (
+                    <li key={idx} className="text-gray-300 text-sm flex items-start gap-2">
+                      <span className="text-yellow-400 font-bold">•</span>
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
 
           {/* Metadata */}
           <div>
@@ -93,7 +112,7 @@ export default function ContextModal({ context, isOpen, onClose }: ContextModalP
                 <div>
                   <span className="text-gray-400">Caracteres:</span>
                   <span className="ml-2 text-white font-medium">
-                    {context.content.length.toLocaleString()}
+                    {context.text.length.toLocaleString()}
                   </span>
                 </div>
                 {context.source.type === 'url' && context.source.url && (
