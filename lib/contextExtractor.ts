@@ -17,14 +17,20 @@ export interface ExtractedContext {
 export class ContextExtractor {
   async extractFromPDF(file: File): Promise<ExtractedContext> {
     try {
+      console.log('📤 Enviando PDF para processamento:', file.name);
+
       const formData = new FormData();
       formData.append('file', file);
 
       // Get API config from localStorage
       const apiKey = typeof window !== 'undefined' ? localStorage.getItem('aiApiKey') : null;
+      const provider = typeof window !== 'undefined' ? localStorage.getItem('aiProvider') : null;
       const model = typeof window !== 'undefined' ? localStorage.getItem('aiModel') : null;
 
+      console.log('🔑 Configuração:', { hasApiKey: !!apiKey, provider, model });
+
       if (apiKey) formData.append('apiKey', apiKey);
+      if (provider) formData.append('provider', provider);
       if (model) formData.append('model', model);
 
       const response = await fetch('/api/extract-pdf', {
@@ -32,11 +38,21 @@ export class ContextExtractor {
         body: formData,
       });
 
+      console.log('📡 Resposta da API:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error('PDF extraction failed');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ Erro na API:', errorData);
+        throw new Error(errorData.error || 'PDF extraction failed');
       }
 
       const data = await response.json();
+      console.log('✅ PDF processado com sucesso:', {
+        textLength: data.text?.length,
+        summaryLength: data.summary?.length,
+        keyPointsCount: data.keyPoints?.length
+      });
+
       return {
         text: data.text,
         summary: data.summary,
@@ -47,7 +63,7 @@ export class ContextExtractor {
         },
       };
     } catch (error) {
-      console.error('PDF extraction error:', error);
+      console.error('❌ PDF extraction error:', error);
       throw error;
     }
   }

@@ -191,13 +191,23 @@ export default function InterviewTranslator() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    console.log('📄 Iniciando upload do PDF:', file.name);
+    setIsProcessing(true);
+
     try {
       const context = await contextExtractorRef.current.extractFromPDF(file);
       setContexts(prev => [...prev, context]);
-    } catch (error) {
-      console.error('PDF upload error:', error);
+      console.log('✅ PDF adicionado aos contextos!');
+
+      // Show success feedback (optional - could add a toast notification)
+      alert(`✅ PDF "${file.name}" processado com sucesso!\n\nClique no card para ver os detalhes.`);
+    } catch (error: any) {
+      console.error('❌ PDF upload error:', error);
+      alert(`❌ Erro ao processar PDF:\n\n${error.message || error}\n\nVerifique:\n1. API Key configurada\n2. PDF não corrompido\n3. Conexão com internet`);
+    } finally {
+      setIsProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleURLAdd = async () => {
