@@ -8,6 +8,7 @@ import TranslationService from '@/lib/translationService';
 import ResponseGenerator, { ResponseSuggestion } from '@/lib/responseGenerator';
 import ContextExtractor, { ExtractedContext } from '@/lib/contextExtractor';
 import SettingsPanel, { AIConfig } from './SettingsPanel';
+import ContextModal from './ContextModal';
 
 interface ConversationTurn {
   id: string;
@@ -30,6 +31,8 @@ export default function InterviewTranslator() {
   const [showApiWarning, setShowApiWarning] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [audioSource, setAudioSource] = useState<'microphone' | 'system'>('microphone');
+  const [selectedContext, setSelectedContext] = useState<ExtractedContext | null>(null);
+  const [isContextModalOpen, setIsContextModalOpen] = useState(false);
   const [aiConfig, setAiConfig] = useState<AIConfig>({
     provider: 'google',
     apiKey: '',
@@ -275,12 +278,16 @@ export default function InterviewTranslator() {
       {/* Context Display - More Visible */}
       {contexts.length > 0 && (
         <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex-shrink-0">
-          <div className="text-xs text-gray-400 mb-1 font-semibold">📄 Contextos ({contexts.length}):</div>
+          <div className="text-xs text-gray-400 mb-1 font-semibold">📄 Contextos ({contexts.length}): <span className="text-[10px] text-gray-500">(clique para ver detalhes)</span></div>
           <div className="space-y-1 max-h-24 overflow-y-auto">
             {contexts.map((ctx, idx) => (
               <div
                 key={idx}
-                className="bg-blue-900/30 border border-blue-700 rounded px-2 py-1 flex items-start gap-2 group text-xs"
+                onClick={() => {
+                  setSelectedContext(ctx);
+                  setIsContextModalOpen(true);
+                }}
+                className="bg-blue-900/30 border border-blue-700 rounded px-2 py-1 flex items-start gap-2 group text-xs cursor-pointer hover:bg-blue-900/50 hover:border-blue-500 transition"
               >
                 <FileText className="w-3 h-3 text-blue-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
@@ -288,8 +295,11 @@ export default function InterviewTranslator() {
                   <div className="text-blue-400/70 text-[10px] line-clamp-1">{ctx.summary}</div>
                 </div>
                 <button
-                  onClick={() => removeContext(idx)}
-                  className="text-red-400 hover:text-red-300 transition flex-shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeContext(idx);
+                  }}
+                  className="text-red-400 hover:text-red-300 transition flex-shrink-0 opacity-0 group-hover:opacity-100"
                   title="Remover"
                 >
                   <X className="w-3 h-3" />
@@ -483,6 +493,15 @@ export default function InterviewTranslator() {
           </div>
         )}
       </div>
+
+      <ContextModal
+        context={selectedContext}
+        isOpen={isContextModalOpen}
+        onClose={() => {
+          setIsContextModalOpen(false);
+          setSelectedContext(null);
+        }}
+      />
 
       <SettingsPanel
         isOpen={isSettingsOpen}
