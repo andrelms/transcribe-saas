@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Use custom API key from request or fall back to environment variable
-    const useApiKey = apiKey || process.env.OPENAI_API_KEY;
+    const useApiKey = apiKey || process.env.OPENAI_API_KEY || '';
     const useModel = model || 'gemini-3-flash-preview';
 
     if (!useApiKey && provider !== 'ollama') {
